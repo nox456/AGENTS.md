@@ -169,6 +169,17 @@ Scope:     git diff <base SHA>...HEAD
 Budget:    20 mutants | 10 minutes
 ```
 
+**No `node_modules` in the worktree → park, don't ask.** Mutation testing runs the suite, and
+worktrees get no install. Before delegating, check `<worktree>/node_modules`. If it is missing:
+1. Run `worktree-temp-task` to park the branch in the main checkout.
+2. Delegate with `Worktree:`, `Plan:` and `PRD:` pointing at the main checkout's copies.
+3. When pnpm's shim fails non-interactively ("No version is set"), tell the agent to run pnpm
+   through `bash -lic '…'`.
+4. Once the report is in, run `worktree-temp-task`'s Restore, before Step 6, which keeps the
+   worktree paths.
+
+Never ask to install instead.
+
 Show the report unchanged. Survivors are test gaps, not code fixes. Offer another Step 4 write
 pass for them; do not start one unasked. Confirm `git status --short` matches what it showed
 before the run.
@@ -235,7 +246,7 @@ The first line of every agent's final message is its RESULT line:
 | --- | --- |
 | `OK` | Show the report unchanged and move to the next step |
 | `NEEDS_INPUT — <question · options>` | Ask the user with `AskUserQuestion`, using those options. Then delegate again, with the missing input line filled in (`Selection:`, `Budget:`, `Code review:`) or `Answer: <question> → <user's answer>` appended |
-| `BLOCKED — <reason · where it looked>` | Stop the chain. Report the reason, and ask whether to fix the cause and retry, or skip the step if it is optional. A required step is never skipped |
+| `BLOCKED — <reason · where it looked>` | Stop the chain. Report the reason, and ask whether to fix the cause and retry, or skip the step if it is optional. A required step is never skipped. **Exception:** blocked because the worktree has no installed dependencies → don't ask; park with `worktree-temp-task` and re-delegate, as in Step 5 |
 
 A message with no RESULT line counts as `BLOCKED — agent returned no RESULT line`. Show what it
 returned.

@@ -37,6 +37,7 @@ install.sh                 creates/refreshes the symlinks
 | [fix-review-findings](skills/fix-review-findings/) | Fixes the `code-review` / `refactor-review` findings you pick one at a time — verify, suggest a Conventional Commits title, and wait for your commit before starting the next. | `code-review`, `refactor-review` |
 | [fix-merge-conflicts](skills/fix-merge-conflicts/) | Resolves the conflicts of a stopped rebase and stages them — one line per file on how each was fixed, anything ambiguous left unmerged for you, and `git rebase --continue` left to you. | — |
 | [worktree-temp-task](skills/worktree-temp-task/) | Lends a worktree's branch and its uncommitted files to the main checkout for a task that only runs there, then puts the branch, the files and the main checkout's previous branch back — never deleting the worktree. | — |
+| [flow-video](skills/flow-video/) | Makes a silent tutorial video of one app flow — screens rebuilt in Remotion from the app's own source, one subtitle per action from a script you approve, rendered into the repo's `videos/` folder. | — |
 | [english-coach](skills/english-coach/) | Appends a short English-coaching note to every response, rewriting the phrasings that read non-native. | — |
 
 ### External

@@ -14,7 +14,8 @@ A Claude Code PreToolUse hook. Reads the hook input JSON on stdin, then allows t
 Modes:
   readonly    Bash runs only: git diff|log|show|status|rev-parse|fetch, rg, ls, cat,
               gh pr diff, gh pr view, gh issue view. No redirection into files, no command
-              substitution. Used by code-reviewer and refactor-reviewer.
+              substitution. Used by code-reviewer, refactor-reviewer and implementer
+              (which writes files through Edit/Write only, and runs no toolchain).
   no-git      Bash never runs git add|commit|push|stash|restore|reset|checkout|switch|rebase|
               merge|clean. Used by every agent.
   tests-only  Edit/Write only on a test file (fixtures and factories included) or *.md.
@@ -81,7 +82,7 @@ check_readonly_segment() {
   for word in "${words[@]}"; do
     case "$word" in
       --output | --output=* | --upload-pack* | --exec=*)
-        deny "\"$word\" makes git write a file or run a program. Reviewers report; they do not change anything." ;;
+        deny "\"$word\" makes git write a file or run a program, and read-only Bash does neither." ;;
     esac
   done
 
@@ -130,7 +131,7 @@ guard_readonly() {
   # Discarding output is not a write; strip those redirections before looking for real ones.
   cmd="$(printf '%s' "$cmd" | sed -E 's#[0-9]*>&[0-9]+-?##g; s#&>>?[[:space:]]*/dev/null##g; s#[0-9]*>>?[[:space:]]*/dev/null##g')"
   case "$cmd" in
-    *'>'*) deny "redirecting output into a file is a write. Reviewers report; they do not change anything." ;;
+    *'>'*) deny "redirecting output into a file is a write, and read-only Bash writes nothing. An agent with Edit/Write writes through those." ;;
   esac
   while IFS= read -r segment; do
     check_readonly_segment "$segment"

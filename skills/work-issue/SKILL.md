@@ -1,32 +1,35 @@
 ---
 name: work-issue
-description: Run the development workflow on one issue from the implementation plan onward — plan and implement in this session, then delegate tests, mutation testing and both reviews to isolated subagents (tester, mutation-tester, code-reviewer, refactor-reviewer) so no verifier grades code it wrote, relay every question they return, fix the findings code-review first, and attach the plan to the issue. Use after `/start-issue` has written the PRD, or when the user says "work this issue", "run the workflow on it", "take it from plan to review", "continue the issue", "do the rest of the workflow", or invokes /work-issue. Only continues an issue that `/start-issue` set up in this worktree, and refuses otherwise. Not for one step run by hand — `/code-review`, `/write-tests`, `/mutation-testing` and `/refactor-review` still run in-session on their own.
+description: Run the development workflow on one issue from the implementation plan onward — plan in this session, hand each plan phase to the implementer subagent while this session keeps the loop and waits on the user's commits, then delegate tests, mutation testing and both reviews to isolated subagents (tester, mutation-tester, code-reviewer, refactor-reviewer) so no verifier grades code it wrote, relay every question they return, fix the findings code-review first, and attach the plan to the issue. Use after `/start-issue` has written the PRD, or when the user says "work this issue", "run the workflow on it", "take it from plan to review", "continue the issue", "do the rest of the workflow", or invokes /work-issue. Only continues an issue that `/start-issue` set up in this worktree, and refuses otherwise. Not for one step run by hand — `/code-review`, `/write-tests`, `/mutation-testing` and `/refactor-review` still run in-session on their own.
 ---
 
 # Work an issue through the workflow
 
-Runs the `CLAUDE.md` "Development workflow" from step 2 to the end on one issue. Planning,
-implementation and fixes run here, because they need the user mid-run. Every verifier runs in a
-subagent that did not write the code: the `tester`, `mutation-tester`, `code-reviewer` and
-`refactor-reviewer` agents in `~/.claude/agents/`, each wrapping its skill. This skill is the
-only path that delegates them.
+Runs the `CLAUDE.md` "Development workflow" from step 2 to the end on one issue. Planning, the
+phase loop and fixes run here, because they need the user mid-run. Each plan phase is written by
+the `implementer` agent, so this session holds one report per phase, never the phase's files and
+diffs. Every verifier runs in a subagent that did not write the code: the `tester`,
+`mutation-tester`, `code-reviewer` and `refactor-reviewer` agents. All five live in
+`~/.claude/agents/`, each wrapping its skill, and this skill is the only path that delegates
+them.
 
 ## Ground rules
 
 - **Only issues `/start-issue` set up.** Its hand-off record in the worktree's git directory is
   the gate (Step 1). Without it, stop and send the user to `/start-issue`. Never create or edit
   the record to get past the gate; the only edit allowed is Step 3 adding the plan path.
-- **Verifiers are delegated, never run here.** Tests, mutation and both reviews go to their
-  agents. If an agent type is missing from the Agent tool's list, stop and tell the user to run
-  `./install.sh` in their `CLAUDE.md` repo. Never fall back to running the skill in this
-  session: the run would lose the independence it exists for.
+- **Phases and verifiers are delegated, never run here.** Each plan phase goes to `implementer`;
+  tests, mutation and both reviews go to their agents. If an agent type is missing from the
+  Agent tool's list, stop and tell the user to run `./install.sh` in their `CLAUDE.md` repo.
+  Never fall back to running the skill in this session: a verifier would lose the independence
+  it exists for, and a phase would fill this session with every file and diff it touches.
 - **The user picks the optional steps; required steps always run.** `write-tests` and
   `refactor-review` are optional. `mutation-testing` is required whenever `write-tests` ran.
   `code-review` and "Attach docs" are always required (Step 2).
 - **Every gate reaches the user.** A subagent cannot ask anything. A `RESULT: NEEDS_INPUT` is
   relayed with `AskUserQuestion`, using the options the agent gave; never answer it yourself.
 - **Inputs are absolute values.** Every delegation carries the plan path, PRD path or `none`,
-  worktree path and base commit SHA, resolved once in Step 1. A subagent starts cold, and a
+  worktree path and, for a verifier, the base commit SHA, resolved once in Step 1. A subagent starts cold, and a
   relative path or a branch name makes it search or guess.
 - **Agent reports pass through unchanged.** Show the findings, audit and mutation report exactly
   as returned. `fix-review-findings` parses those formats.
@@ -41,7 +44,7 @@ only path that delegates them.
 
 - [ ] Step 1 — Resolve the issue, worktree, documents and base
 - [ ] Step 2 — Agree on the steps to run
-- [ ] Step 3 — Plan and implement, in this session
+- [ ] Step 3 — Plan here, implement through `implementer`
 - [ ] Step 4 — Tests: audit, selection, write (if chosen)
 - [ ] Step 5 — Mutation testing (whenever Step 4 ran)
 - [ ] Step 6 — Both reviews, in parallel
@@ -100,14 +103,14 @@ which required step that leaves out and ask whether to drop it.
 
 | This skill | Runs | Rule | Where |
 | --- | --- | --- | --- |
-| Step 3 | `write-implementation-plan`, `implementation-loop` | Required, unless already done | Here |
+| Step 3 | `write-implementation-plan`, `implementation-loop` | Required, unless already done | Plan here · phases in `implementer` |
 | Step 4 | `write-tests` | Optional | `tester` agent, two passes |
 | Step 5 | `mutation-testing` | Required if Step 4 ran | `mutation-tester` agent |
 | Step 6 | `code-review` + `refactor-review` | CR required · RR optional | Both agents, one message |
 | Step 7 | `fix-review-findings` | When the user picks findings | Here |
 | Step 8 | Attach docs | Required | Here, after asking |
 
-### Step 3 — Plan and implement, in this session
+### Step 3 — Plan here, implement through `implementer`
 
 - No plan yet → invoke `write-implementation-plan` with the Skill tool, passing the PRD path
   and the issue. Follow it to the end, including where it asks to save the plan. Then store the
@@ -117,8 +120,10 @@ which required step that leaves out and ask whether to drop it.
   f="$(git rev-parse --absolute-git-dir)/start-issue.json"
   jq --arg plan "<absolute plan path>" '.plan = $plan' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
   ```
-- Then invoke `implementation-loop` on the plan and follow it to the end. It waits on the user's
-  commit after every phase.
+- Then implement the plan one phase at a time, one `implementer` agent per phase, waiting on the
+  user's commit after each. Read `references/implementation-phases.md` before the first phase:
+  it is the loop this session runs around the agent, including the one-time offer to run risky
+  phases on Opus. Do not invoke `implementation-loop` here; the agent preloads it.
 - A plan whose build sequence is already marked done skips both. Say so.
 
 Before Step 4, `git status --short` must show no uncommitted production code. If it does, ask
@@ -229,7 +234,9 @@ the user the paths to attach by hand.
 
 Report, compactly:
 - the steps that ran and the ones skipped, and why
-- the commits the user made
+- the commits the user made, and the phases run on Opus
+- the checks that never ran: format, lint, typecheck, the suite, and each phase `Verify` the
+  `implementer` could not run
 - coverage before → after
 - the mutation score
 - both review scores
@@ -244,8 +251,8 @@ The first line of every agent's final message is its RESULT line:
 
 | RESULT | Do |
 | --- | --- |
-| `OK` | Show the report unchanged and move to the next step |
-| `NEEDS_INPUT — <question · options>` | Ask the user with `AskUserQuestion`, using those options. Then delegate again, with the missing input line filled in (`Selection:`, `Budget:`, `Code review:`) or `Answer: <question> → <user's answer>` appended |
+| `OK` | Show the report unchanged and move to the next step. An `implementer` report is cross-checked and reported as `references/implementation-phases.md` says |
+| `NEEDS_INPUT — <question · options>` | Ask the user with `AskUserQuestion`, using those options. Then delegate again, with the missing input line filled in (`Selection:`, `Budget:`, `Code review:`) or `Answer: <question> → <user's answer>` appended. An `implementer` is resumed with `SendMessage` instead, since it may have edited files already |
 | `BLOCKED — <reason · where it looked>` | Stop the chain. Report the reason, and ask whether to fix the cause and retry, or skip the step if it is optional. A required step is never skipped. **Exception:** blocked because the worktree has no installed dependencies → don't ask; park with `worktree-temp-task` and re-delegate, as in Step 5 |
 
 A message with no RESULT line counts as `BLOCKED — agent returned no RESULT line`. Show what it

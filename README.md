@@ -23,7 +23,7 @@ install.sh                 creates/refreshes the symlinks
 | Name | Description | Depends on |
 | --- | --- | --- |
 | [start-issue](skills/start-issue/) | Sets up a dedicated session for one issue — checks your existing branch, creates its worktree, moves in, starts the PRD, and leaves the hand-off record `/work-issue` continues from. | `using-git-worktrees`, `write-prd` |
-| [work-issue](skills/work-issue/) | Runs the workflow on an issue `start-issue` set up — plans and implements in the session, delegates tests, mutation testing and both reviews to the isolated agents below, relays their questions, fixes the findings code-review first, and attaches the docs to the issue. | `start-issue`, `write-implementation-plan`, `implementation-loop`, `fix-review-findings`, the four agents |
+| [work-issue](skills/work-issue/) | Runs the workflow on an issue `start-issue` set up — plans in the session, hands each plan phase to the `implementer` agent, delegates tests, mutation testing and both reviews to the isolated agents below, relays their questions, fixes the findings code-review first, and attaches the docs to the issue. | `start-issue`, `write-implementation-plan`, `implementation-loop`, `fix-review-findings`, the five agents |
 | [start-pr-review](skills/start-pr-review/) | Sets up a dedicated session for one pull request — checks your local branch is at the PR head, creates its worktree, moves in, runs the PR review, and offers to remove the worktree afterwards. | `using-git-worktrees`, `pr-review` |
 | [write-prd](skills/write-prd/) | Interviews the requester and grounds the result in the codebase to produce a PRD with scope, numbered requirements and Given/When/Then acceptance criteria, reviewed with you before hand-off. | — |
 | [write-implementation-plan](skills/write-implementation-plan/) | Turns an issue or PRD into a technical plan: change list by layer, numbered requirements, ordered build sequence, rollback path. | `write-prd` (optional input) |
@@ -52,13 +52,15 @@ a deliberate local fork that the next update will have to be reconciled against.
 
 ## Agents
 
-Subagents that run a verification skill in a context that did not write the code. Only
-`/work-issue` delegates to them; invoking any of these skills by hand still runs it in-session,
-as before. Each agent returns a `RESULT: OK | NEEDS_INPUT | BLOCKED` line followed by its
-skill's own report, unchanged.
+Subagents that run one workflow skill each. `implementer` writes one plan phase per run, so the
+main session never holds the phase's files and diffs; the four verifiers run their skill in a
+context that did not write the code. Only `/work-issue` delegates to them; invoking any of these
+skills by hand still runs it in-session, as before. Each agent returns a
+`RESULT: OK | NEEDS_INPUT | BLOCKED` line followed by its skill's own report.
 
 | Name | Wraps | Tools | Model · effort | Guard modes |
 | --- | --- | --- | --- | --- |
+| [implementer](agents/implementer.md) | `implementation-loop`, one phase per run; runs no format, lint, typecheck or tests | Read, Grep, Glob, Bash, Edit, Write | `claude-sonnet-5-5` · high (Opus for a phase you approve) | `readonly`, `skills-read` |
 | [code-reviewer](agents/code-reviewer.md) | `code-review` | Read, Grep, Glob, Bash | `claude-opus-5` · high | `readonly`, `skills-read` |
 | [refactor-reviewer](agents/refactor-reviewer.md) | `refactor-review` | Read, Grep, Glob, Bash | `claude-opus-5` · high | `readonly`, `skills-read` |
 | [tester](agents/tester.md) | `write-tests`, in an audit pass and a write pass | Read, Grep, Glob, Bash, Edit, Write | `sonnet` · high | `no-git`, `tests-only`, `skills-read` |

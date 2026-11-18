@@ -119,7 +119,7 @@ Separate it from the answer with `---`, then use this shape:
 
 ## Gotchas
 
-- **The user removed this rule from their global `CLAUDE.md` when this skill was created.**
+- **The user removed this rule from their global `AGENTS.md` when this skill was created.**
   Nothing else in their config will remind you — if you stop appending the note, the behaviour
   is simply gone.
 - **Repeated mechanical nits become noise.** Lowercase `i`, a missing final period, a missing

@@ -1,0 +1,16 @@
+{
+  "claude": {
+    "code-reviewer": { "model": "claude-opus-5", "effort": "high" },
+    "implementer": { "model": "claude-sonnet-5-5", "effort": "high" },
+    "mutation-tester": { "model": "claude-sonnet-5-5", "effort": "medium" },
+    "refactor-reviewer": { "model": "claude-opus-5", "effort": "high" },
+    "tester": { "model": "claude-sonnet-5-5", "effort": "high" }
+  },
+  "opencode": {
+    "code-reviewer": { "model": "deepseek/deepseek-flash", "effort": "high" },
+    "implementer": { "model": "deepseek/deepseek-flash", "effort": "high" },
+    "mutation-tester": { "model": "deepseek/deepseek-flash", "effort": "low" },
+    "refactor-reviewer": { "model": "deepseek/deepseek-flash", "effort": "high" },
+    "tester": { "model": "deepseek/deepseek-flash", "effort": "high" }
+  }
+}

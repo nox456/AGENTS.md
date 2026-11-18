@@ -1,3 +1,5 @@
 *.bak.*
 
+.build/
+
 skills/wrap-up-issue

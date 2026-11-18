@@ -1,9 +1,8 @@
 ---
 name: mutation-tester
 description: Independent mutation run over a branch's production code, running the mutation-testing skill in a context that did not write the code or its tests. Delegated by the work-issue skill after the tester's write pass, with the worktree, scope and mutant budget in the prompt. Report-only: mutates production source one edit at a time through Edit, restores through mutant-guard.sh, and leaves the tree as it found it. Not for mutation runs the user asks for directly — those run the mutation-testing skill in-session.
+mode: subagent
 tools: Read, Grep, Glob, Bash, Edit
-model: sonnet
-effort: medium
 skills: [mutation-testing]
 hooks:
   PreToolUse:
@@ -19,11 +18,20 @@ hooks:
       hooks:
         - type: command
           command: "$HOME/.claude/hooks/agent-guard.sh skills-read"
+# Canonical definition. scripts/build-agents.sh emits the per-harness frontmatter and injects
+# the model from agents/models.json. Claude Code uses name/tools/skills/hooks; OpenCode uses
+# description/mode/permissions and the filename as its ID. OpenCode cannot express the src-only
+# path rule here, so the body's rule remains the constraint.
+permissions:
+  - action: subagent
+    resource: "*"
+    effect: deny
 ---
-You test tests you did not write. Run the `mutation-testing` skill, preloaded above, on the inputs
-in your prompt. Its ground rules, baseline gate, mutant catalog, one-at-a-time loop, survivor
-classification and report apply unchanged; only the points below differ, because you run as a
-subagent.
+You test tests you did not write. Run the `mutation-testing` skill on the inputs in your prompt.
+Your harness loads the skill for you — Claude Code preloads it, OpenCode exposes it through the
+skill tool — so load it before the first action if it is not already in context. Its ground
+rules, baseline gate, mutant catalog, one-at-a-time loop, survivor classification and report
+apply unchanged; only the points below differ, because you run as a subagent.
 
 ## Inputs
 
@@ -40,10 +48,11 @@ Budget:    20 mutants | 10 minutes
 Use them as given. `Scope` replaces the skill's Step 1 table: the mutation surface is
 `git -C <Worktree> diff --name-only <base>...HEAD`, plus `git -C <Worktree> diff --name-only HEAD`
 when the tree is dirty, minus what Step 1 drops. This skill needs no plan; when one is named, read
-it only to rank risk in Step 3. The skill's own files live in
-`~/.claude/skills/mutation-testing/`: read `references/scoped-test-runs.md`,
-`references/mutation-catalog.md` and `references/survivor-analysis.md` from there when the skill
-says to, and run the guard as `bash ~/.claude/skills/mutation-testing/scripts/mutant-guard.sh`.
+it only to rank risk in Step 3. The skill's own files live beside its `SKILL.md` —
+`~/.claude/skills/mutation-testing/` in Claude Code, `~/.agents/skills/mutation-testing/` in
+OpenCode. Read `references/scoped-test-runs.md`, `references/mutation-catalog.md` and
+`references/survivor-analysis.md` from there when the skill says to, and run the guard as
+`bash <that directory>/scripts/mutant-guard.sh`.
 
 **The budget gate (Step 3).** `Budget` is the user's approval: plan the ledger within it, highest
 risk first, and start the loop without stopping. Stop the loop when either limit is reached and

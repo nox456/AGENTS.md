@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Validate an Agent Skill directory against the mechanical rules of the agentskills.dev spec.
+# Validate an Agent Skill directory against the mechanical rules of the agentskills.io spec.
 # See --help. Judgement calls live in references/review-checklist.md, not here.
 set -uo pipefail
 
@@ -14,7 +14,7 @@ usage() {
   cat <<'USAGE'
 Usage: validate-skill.sh [--json] SKILL_DIR [SKILL_DIR...]
 
-Checks a skill directory against the agentskills.dev spec: frontmatter fields and limits,
+Checks a skill directory against the agentskills.io spec: frontmatter fields and limits,
 name/directory agreement, the progressive-disclosure budget for SKILL.md, whether every
 relative path named in SKILL.md resolves, and whether every bundled file is referenced.
 
@@ -28,7 +28,7 @@ Exit codes:
   2  Usage error (no directory given, or the path is not a directory).
 
 Examples:
-  validate-skill.sh .claude/skills/write-skill
+  validate-skill.sh skills/write-skill
   validate-skill.sh --json skills/*/ | jq -r 'select(.level=="ERROR")'
 USAGE
 }

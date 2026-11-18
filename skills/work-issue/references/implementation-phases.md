@@ -14,21 +14,23 @@ and never send one agent more than one phase.
 2. **No checks.** Worktrees get no dependency install, so neither this session nor the agent
    discovers or runs format, lint, typecheck or tests, and a phase's own `Verify` runs only when
    it needs no toolchain. Tell the user once, here.
-3. **Offer Opus, once.** Scan the phases still to run for ones Sonnet is likely to get wrong: a
-   data migration or backfill, transactions or concurrency, auth or permission rules, a contract
-   later phases build on, or a phase the plan's risks table names. If any qualify, ask with
-   `AskUserQuestion` which of them run on Opus: one option per phase with its reason, riskiest
-   first, at most four, `multiSelect: true`; with a single candidate, ask Opus or Sonnet for it.
-   Selecting none keeps every phase on Sonnet. No phase runs on Opus without the user's yes. The
-   user may also ask for Opus on any phase later.
+3. **Offer Opus, once (Claude Code only).** Under OpenCode the implementer's model comes from
+   `agents/models.json`; skip this step. Under Claude Code, scan the phases still to run for ones
+   Sonnet is likely to get wrong: a data migration or backfill, transactions or concurrency, auth
+   or permission rules, a contract later phases build on, or a phase the plan's risks table names.
+   If any qualify, ask with `AskUserQuestion` which of them run on Opus: one option per phase with
+   its reason, riskiest first, at most four, `multiSelect: true`; with a single candidate, ask
+   Opus or Sonnet for it. Selecting none keeps every phase on Sonnet. No phase runs on Opus
+   without the user's yes. The user may also ask for Opus on any phase later.
 
 ## Per phase
 
 1. **Commit gate.** `git status --short` lists nothing but, at most, the plan and the PRD.
    Anything else means the last phase is not committed: ask the user to commit it, and wait. The
    agent refuses to start on top of uncommitted code.
-2. **Delegate.** Agent tool, `subagent_type: implementer`, plus `model: "opus"` only for a phase
-   the user picked:
+2. **Delegate.** Claude Code: Agent tool, `subagent_type: implementer`, plus `model: "opus"` only
+   for a phase the user picked. OpenCode: the `subagent` tool with agent `implementer` and its
+   configured model.
 
    ```
    Plan:      <absolute path>
@@ -58,7 +60,7 @@ and never send one agent more than one phase.
    agent's result:
 
    ```
-   Phase <n> — <step name> · <Sonnet | Opus>
+   Phase <n> — <step name> · <the model it ran on>
    Files:       <path — what, one line each>
    Verify:      <passed — what | not run — the plan's check>
    Checks:      format, lint, typecheck and tests not run (no dependencies in the worktree)

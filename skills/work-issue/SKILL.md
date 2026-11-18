@@ -5,13 +5,13 @@ description: Run the development workflow on one issue from the implementation p
 
 # Work an issue through the workflow
 
-Runs the `CLAUDE.md` "Development workflow" from step 2 to the end on one issue. Planning, the
+Runs the `AGENTS.md` "Development workflow" from step 2 to the end on one issue. Planning, the
 phase loop and fixes run here, because they need the user mid-run. Each plan phase is written by
 the `implementer` agent, so this session holds one report per phase, never the phase's files and
 diffs. Every verifier runs in a subagent that did not write the code: the `tester`,
 `mutation-tester`, `code-reviewer` and `refactor-reviewer` agents. All five live in
-`~/.claude/agents/`, each wrapping its skill, and this skill is the only path that delegates
-them.
+`~/.claude/agents/` under Claude Code and `~/.config/opencode/agents/` under OpenCode, each
+wrapping its skill, and this skill is the only path that delegates them.
 
 ## Ground rules
 
@@ -20,9 +20,10 @@ them.
   the record to get past the gate; the only edit allowed is Step 3 adding the plan path.
 - **Phases and verifiers are delegated, never run here.** Each plan phase goes to `implementer`;
   tests, mutation and both reviews go to their agents. If an agent type is missing from the
-  Agent tool's list, stop and tell the user to run `./install.sh` in their `CLAUDE.md` repo.
-  Never fall back to running the skill in this session: a verifier would lose the independence
-  it exists for, and a phase would fill this session with every file and diff it touches.
+  harness's delegation tool (Claude Code's Agent tool, OpenCode's `subagent` tool), stop and
+  tell the user to run `./install.sh` in their agent-config repo. Never fall back to running the
+  skill in this session: a verifier would lose the independence it exists for, and a phase would
+  fill this session with every file and diff it touches.
 - **The user picks the optional steps; required steps always run.** `write-tests` and
   `refactor-review` are optional. `mutation-testing` is required whenever `write-tests` ran.
   `code-review` and "Attach docs" are always required (Step 2).
@@ -122,8 +123,8 @@ which required step that leaves out and ask whether to drop it.
   ```
 - Then implement the plan one phase at a time, one `implementer` agent per phase, waiting on the
   user's commit after each. Read `references/implementation-phases.md` before the first phase:
-  it is the loop this session runs around the agent, including the one-time offer to run risky
-  phases on Opus. Do not invoke `implementation-loop` here; the agent preloads it.
+  it is the loop this session runs around the agent, including the Claude Code one-time offer to
+  run risky phases on Opus. Do not invoke `implementation-loop` here; the agent preloads it.
 - A plan whose build sequence is already marked done skips both. Say so.
 
 Before Step 4, `git status --short` must show no uncommitted production code. If it does, ask
@@ -234,7 +235,7 @@ the user the paths to attach by hand.
 
 Report, compactly:
 - the steps that ran and the ones skipped, and why
-- the commits the user made, and the phases run on Opus
+- the commits the user made, and any phases escalated to a model other than the configured one
 - the checks that never ran: format, lint, typecheck, the suite, and each phase `Verify` the
   `implementer` could not run
 - coverage before → after
@@ -265,12 +266,12 @@ returned.
   on it.
 - A permission prompt raised inside an agent reaches the user, not you. Tell them a pending
   approval may be waiting if an agent seems stuck.
-- The agents' hooks need `jq` and `~/.claude/hooks/agent-guard.sh`. A denial saying
-  `jq is not installed`, or a "command not found" from the hook, means the guards are off. Stop
-  and report it; do not run the agent unguarded.
-- `CLAUDE_CONFIG_DIR` set to anything but `~/.claude` breaks the agents' hook path, and the
-  guards then fail open. Check `echo "${CLAUDE_CONFIG_DIR:-unset}"` in Step 1 and warn if it is
-  set.
+- Under Claude Code the agents' hooks need `jq` and `~/.claude/hooks/agent-guard.sh`. A denial
+  saying `jq is not installed`, or a "command not found" from the hook, means the guards are off.
+  Stop and report it; do not run the agent unguarded.
+- Under Claude Code, `CLAUDE_CONFIG_DIR` set to anything but `~/.claude` breaks the agents' hook
+  path, and the guards then fail open. Check `echo "${CLAUDE_CONFIG_DIR:-unset}"` in Step 1 and
+  warn if it is set. OpenCode enforces the agents' `permissions` frontmatter instead of hooks.
 - The reviewers review `HEAD`, not the working tree. Uncommitted fixes are invisible to a
   re-review, so commit first.
 - The hand-off record lives in `.git/worktrees/<name>/`, not in the working tree. It is never

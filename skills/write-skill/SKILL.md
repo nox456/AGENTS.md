@@ -1,12 +1,12 @@
 ---
 name: write-skill
-description: Author or revise an Agent Skill (a SKILL.md and its bundled files) so it follows the published agentskills.dev spec and best practices — read the spec from the agentskills MCP server first, ground the skill in real expertise instead of generic advice, keep SKILL.md inside the progressive-disclosure budget, write a description that triggers reliably, then validate with scripts/validate-skill.sh. Use when asked to "create a skill", "write a skill", "turn this into a skill", "make a slash command", "review/improve/split this skill", "why doesn't my skill trigger", or when invoked as /write-skill. Use it before editing any SKILL.md or its frontmatter, even for a one-line change.
+description: Author or revise an Agent Skill (a SKILL.md and its bundled files) so it follows the published agentskills.io spec and best practices — read the spec from the agentskills MCP server first, ground the skill in real expertise instead of generic advice, keep SKILL.md inside the progressive-disclosure budget, write a description that triggers reliably, then validate with scripts/validate-skill.sh. Use when asked to "create a skill", "write a skill", "turn this into a skill", "make a slash command", "review/improve/split this skill", "why doesn't my skill trigger", or when invoked as /write-skill. Use it before editing any SKILL.md or its frontmatter, even for a one-line change.
 ---
 
 # Write an Agent Skill
 
 Produces a skill an agent actually activates and can follow, in the format defined at
-agentskills.dev. It exists to prevent the two ways skill authoring usually fails: a skill
+agentskills.io. It exists to prevent the two ways skill authoring usually fails: a skill
 generated from a one-line prompt (generic advice the agent already knew) and a skill written
 from memory of the spec (invalid frontmatter, a bloated body, a description that never fires).
 
@@ -140,7 +140,7 @@ trigger rate, train/validation split) — that is the fix, not a hopeful reword.
 ### Step 6 — Validate and self-review
 
 ```bash
-bash .claude/skills/write-skill/scripts/validate-skill.sh <path-to-skill-dir>
+bash skills/write-skill/scripts/validate-skill.sh <path-to-skill-dir>
 ```
 
 It checks the mechanical spec rules (frontmatter, name, limits, budget, resolvable references,
@@ -155,9 +155,9 @@ ignored, time lost to vagueness.
 ### Step 7 — Update the README skills table
 
 Every git-tracked skill in `skills/` has a row in the **Skills** table in `README.md`. Two kinds
-are deliberately absent: skills in `.claude/skills/` (repo-only tooling, `write-skill` included),
-and gitignored skills in `skills/` (private, work-specific ones — check with
-`git check-ignore skills/<name>` before adding a row). For a new skill, add its row in the
+are deliberately absent: gitignored skills (private, work-specific ones — check with
+`git check-ignore skills/<name>` before adding a row) and skills kept only for one project.
+For a new skill, add its row in the
 table's existing order — authoring, then execution, then review, then standalone skills:
 
 | Column | Value |
@@ -171,11 +171,12 @@ Renaming a skill means fixing its link *and* every `Depends on` cell that names 
 
 ### Step 8 — Install and hand off
 
-Place the directory where this project's client looks for it. Detect, do not assume: in this
-repo general-use skills live in `skills/<name>/` and `./install.sh` symlinks them into
-`~/.claude/skills/` (new directories need one `install.sh` run; later edits are live through the
-symlink), while skills meant only for this repo live in `.claude/skills/<name>/`. Elsewhere
-check for `.claude/skills/`, `~/.claude/skills/`, or `.agents/skills/` and follow what is there.
+Place the directory where this project's clients look for it. Detect, do not assume: in this
+repo every skill lives in `skills/<name>/` and `./install.sh` symlinks it into both
+`~/.claude/skills/` (Claude Code) and `~/.agents/skills/` (the cross-agent convention OpenCode
+reads). New directories need one `install.sh` run; later edits are live through the symlink.
+Elsewhere check for `.claude/skills/`, `.agents/skills/`, or `.opencode/skills/` and follow what
+is there.
 
 Report: the path, what the skill covers and deliberately excludes, the files bundled and when
 each loads, validator output, unresolved `WARN`s, the README row added or updated, and how to

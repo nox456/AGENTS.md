@@ -1,20 +1,98 @@
-# CLAUDE.md
+# Agent config
 
-Personal Claude Code configuration: global instructions, custom skills, and the subagents and
-hooks that run the workflow's verification steps in isolation.
+Personal, model-agnostic agent configuration shared by Claude Code and OpenCode: global
+instructions, custom skills and subagents.
 
-The real files live here and are symlinked into `~/.claude/`, so editing them in
-this repo updates Claude Code immediately — no copy step, nothing to keep in sync.
+Every real file lives here and is symlinked into each harness's config directory. Skills and
+context are live once linked; agents are generated per harness from one canonical file, so after
+editing an agent run `./install.sh` (or `scripts/build-agents.sh`) to regenerate it.
 
 ## Layout
 
 ```
-CLAUDE.md              ->  ~/.claude/CLAUDE.md
+AGENTS.md              ->  ~/.claude/CLAUDE.md
+                           ~/.config/opencode/AGENTS.md
 skills/<name>/         ->  ~/.claude/skills/<name>
-agents/<name>.md       ->  ~/.claude/agents/<name>.md
-hooks/<name>           ->  ~/.claude/hooks/<name>
-install.sh                 creates/refreshes the symlinks
+                           ~/.agents/skills/<name>
+agents/<name>.md           canonical agent body + both harnesses' non-model frontmatter
+agents/models.json         per-harness model and effort
+.build/agents/claude/   -> ~/.claude/agents/<name>.md
+.build/agents/opencode/ -> ~/.config/opencode/agents/<name>.md
+hooks/<name>           ->  ~/.claude/hooks/<name>          (Claude Code only)
+scripts/build-agents.sh    emits the per-harness agent files
+scripts/verify.sh          checks the skills, links, and both harnesses' parsing/discovery
+install.sh                 builds agents and creates/refreshes the symlinks
+.claude/settings.local.json  repo-local Claude Code settings, not installed
 ```
+
+## Portable formats
+
+The three layers have different levels of standardization, so they are handled differently.
+
+### Context: `AGENTS.md`
+
+`AGENTS.md` is the cross-tool instruction file ([agents.md](https://agents.md)). Claude Code
+reads it natively, and OpenCode reads it natively. Claude Code's user scope still only looks for
+`~/.claude/CLAUDE.md`, and OpenCode's global scope looks for `~/.config/opencode/AGENTS.md`, so
+`install.sh` links the same file to both names. There is no `CLAUDE.md` copy to maintain.
+
+### Skills: Agent Skills standard
+
+Skills follow the [Agent Skills](https://agentskills.io) open standard — a folder with a
+`SKILL.md` whose frontmatter has `name` and `description`, plus optional `references/`,
+`scripts/`, and `assets/`. Both harnesses read the same files, so a skill is written once.
+
+- Claude Code reads `~/.claude/skills/<name>/SKILL.md`.
+- OpenCode reads `~/.agents/skills/<name>/SKILL.md` (and also `~/.claude/skills/`), with the
+  same progressive-disclosure behavior: only the description is advertised until the skill loads.
+- `~/.agents/skills/` is the cross-agent convention, so the same link serves other tools that
+  adopt the standard.
+
+`scripts/verify.sh` validates every skill against the spec, checks the links each harness reads,
+and — when the harness is installed — confirms Claude Code parses every agent file and OpenCode
+discovers every agent in this repo.
+
+### Agents: one source, generated per harness
+
+There is no cross-tool standard for subagent definitions yet. Emerging formats such as OpenGAP
+and Open Agent Spec exist, but neither Claude Code nor OpenCode reads them natively. Both do read
+Markdown files with YAML frontmatter, but their fields differ, so `agents/<name>.md` is the one
+source and `scripts/build-agents.sh` emits native files under `.build/agents/`:
+
+- **Canonical file**: the shared body plus the fields each harness needs. Claude Code gets
+  `name`, `description`, `tools`, `skills` and `hooks`; OpenCode gets `description`,
+  `mode: subagent` and `permissions`.
+- **`agents/models.json`**: the per-harness `model` and `effort`. This is the part that cannot be
+  shared, because Claude Code and OpenCode use different model IDs and effort syntax.
+- **Generated files**: `.build/agents/claude/<name>.md` and
+  `.build/agents/opencode/<name>.md`, each with clean frontmatter for that harness and no unknown
+  fields.
+
+| Field in `agents/<name>.md` | Goes to | Purpose |
+| --- | --- | --- |
+| `name` | Claude Code | Agent name; OpenCode derives its ID from the filename |
+| `description` | both | When the harness should delegate to the agent |
+| `mode: subagent` | OpenCode | Only launchable as a subagent |
+| `tools` | Claude Code | Claude's tool allowlist |
+| `skills` | Claude Code | Skill preloaded into the agent's context |
+| `hooks` | Claude Code | `PreToolUse` guard — see [Hooks](#hooks) |
+| `permissions` | OpenCode | Equivalent edit/subagent denials — see [Permissions](#permissions) |
+
+The agent body is the system prompt for both harnesses. It refers to the wrapped skill by name
+and gives the skill's path in each harness, rather than assuming `~/.claude/`.
+
+The configured models are:
+
+| Agent | Claude Code | OpenCode |
+| --- | --- | --- |
+| `code-reviewer` | `claude-opus-5` · high | `deepseek/deepseek-flash#high` |
+| `implementer` | `claude-sonnet-5-5` · high | `deepseek/deepseek-flash#high` |
+| `mutation-tester` | `claude-sonnet-5-5` · medium | `deepseek/deepseek-flash#low` |
+| `refactor-reviewer` | `claude-opus-5` · high | `deepseek/deepseek-flash#high` |
+| `tester` | `claude-sonnet-5-5` · high | `deepseek/deepseek-flash#high` |
+
+`deepseek/deepseek-flash` is the OpenCode ID for the DeepSeek V4.1 Flash model; the `#high` and
+`#low` suffixes select its variant.
 
 ## Skills
 
@@ -22,6 +100,7 @@ install.sh                 creates/refreshes the symlinks
 
 | Name | Description | Depends on |
 | --- | --- | --- |
+| [write-skill](skills/write-skill/) | Authors or revises an Agent Skill against the agentskills.io spec — docs first, grounded expertise, progressive-disclosure budget, validated before hand-off. | — |
 | [start-issue](skills/start-issue/) | Sets up a dedicated session for one issue — checks your existing branch, creates its worktree, moves in, starts the PRD, and leaves the hand-off record `/work-issue` continues from. | `using-git-worktrees`, `write-prd` |
 | [work-issue](skills/work-issue/) | Runs the workflow on an issue `start-issue` set up — plans in the session, hands each plan phase to the `implementer` agent, delegates tests, mutation testing and both reviews to the isolated agents below, relays their questions, fixes the findings code-review first, and attaches the docs to the issue. | `start-issue`, `write-implementation-plan`, `implementation-loop`, `fix-review-findings`, the five agents |
 | [start-pr-review](skills/start-pr-review/) | Sets up a dedicated session for one pull request — checks your local branch is at the PR head, creates its worktree, moves in, runs the PR review, and offers to remove the worktree afterwards. | `using-git-worktrees`, `pr-review` |
@@ -58,41 +137,69 @@ context that did not write the code. Only `/work-issue` delegates to them; invok
 skills by hand still runs it in-session, as before. Each agent returns a
 `RESULT: OK | NEEDS_INPUT | BLOCKED` line followed by its skill's own report.
 
-| Name | Wraps | Tools | Model · effort | Guard modes |
-| --- | --- | --- | --- | --- |
-| [implementer](agents/implementer.md) | `implementation-loop`, one phase per run; runs no format, lint, typecheck or tests | Read, Grep, Glob, Bash, Edit, Write | `claude-sonnet-5-5` · high (Opus for a phase you approve) | `readonly`, `skills-read` |
-| [code-reviewer](agents/code-reviewer.md) | `code-review` | Read, Grep, Glob, Bash | `claude-opus-5` · high | `readonly`, `skills-read` |
-| [refactor-reviewer](agents/refactor-reviewer.md) | `refactor-review` | Read, Grep, Glob, Bash | `claude-opus-5` · high | `readonly`, `skills-read` |
-| [tester](agents/tester.md) | `write-tests`, in an audit pass and a write pass | Read, Grep, Glob, Bash, Edit, Write | `sonnet` · high | `no-git`, `tests-only`, `skills-read` |
-| [mutation-tester](agents/mutation-tester.md) | `mutation-testing` | Read, Grep, Glob, Bash, Edit | `sonnet` · medium | `no-git`, `src-only`, `skills-read` |
+Each canonical file is generated into both harnesses with its configured model; the shared body
+is identical in both.
 
-## Hooks
+| Name | Wraps | Tools (Claude Code) | Guard modes (Claude Code) |
+| --- | --- | --- | --- |
+| [implementer](agents/implementer.md) | `implementation-loop`, one phase per run; runs no format, lint, typecheck or tests | Read, Grep, Glob, Bash, Edit, Write | `readonly`, `skills-read` |
+| [code-reviewer](agents/code-reviewer.md) | `code-review` | Read, Grep, Glob, Bash | `readonly`, `skills-read` |
+| [refactor-reviewer](agents/refactor-reviewer.md) | `refactor-review` | Read, Grep, Glob, Bash | `readonly`, `skills-read` |
+| [tester](agents/tester.md) | `write-tests`, in an audit pass and a write pass | Read, Grep, Glob, Bash, Edit, Write | `no-git`, `tests-only`, `skills-read` |
+| [mutation-tester](agents/mutation-tester.md) | `mutation-testing` | Read, Grep, Glob, Bash, Edit | `no-git`, `src-only`, `skills-read` |
+
+### Hooks
+
+Claude Code only. The `PreToolUse` guard turns the agents' "report only", "never commit" and
+"never touch that kind of file" rules from instructions into denials.
 
 | Name | Description | Used by |
 | --- | --- | --- |
 | [agent-guard.sh](hooks/agent-guard.sh) | `PreToolUse` guard with five modes. `readonly` limits Bash to a read-only allowlist. `no-git` denies git commands that change state. `tests-only` and `src-only` limit which files Edit/Write may touch. `skills-read` lets an agent read the skill it wraps without a permission prompt. Fails closed, and needs `jq`. | Every agent, through its frontmatter `hooks:` |
 
+### Permissions
+
+OpenCode has no hooks. It enforces the `permissions` list in each agent's frontmatter instead:
+
+- `code-reviewer`, `refactor-reviewer`: deny all `edit`, deny every `subagent` launch.
+- `implementer`, `tester`, `mutation-tester`: deny every `subagent` launch.
+- Every agent: the body's rules still cover what OpenCode's permission model cannot express —
+  the read-only shell allowlist, `no-git`, `tests-only` and `src-only`.
+
 ## Setup on a new machine
 
 ```bash
-git clone <this-repo> ~/Documents/Projects/CLAUDE.md
-cd ~/Documents/Projects/CLAUDE.md
+git clone https://github.com/nox456/CLAUDE.md ~/Documents/Projects/agent-config
+cd ~/Documents/Projects/agent-config
 ./install.sh
+./scripts/verify.sh
 ```
 
 `install.sh` is idempotent. It backs up any real file it would replace to
 `<name>.bak.<timestamp>`, and removes stale symlinks left behind by skills, agents
 or hooks that were deleted from the repo.
 
-The agents' guard hook needs `jq` on the `PATH`.
+The Claude Code agents' guard hook needs `jq` on the `PATH`.
 
-Set `CLAUDE_CONFIG_DIR` to link somewhere other than `~/.claude`. The agents' hook
-commands still point at `$HOME/.claude/hooks/`, so with it set the guards do not run.
+Set `CLAUDE_CONFIG_DIR` to link somewhere other than `~/.claude`,
+`OPENCODE_CONFIG_DIR` for OpenCode's config directory (default
+`~/.config/opencode`), or `AGENTS_CONFIG_DIR` for the cross-agent skills directory
+(default `~/.agents`). The agents' hook commands still point at
+`$HOME/.claude/hooks/`, so with `CLAUDE_CONFIG_DIR` set the Claude Code guards do not run.
 
 ## Adding a skill
 
 Create `skills/<name>/SKILL.md` here, add a row to the Skills table above, then run
-`./install.sh` to link it. The `/write-skill` skill walks the whole process.
+`./install.sh` to link it into both harnesses. The `/write-skill` skill walks the whole process,
+including validation with `skills/write-skill/scripts/validate-skill.sh`.
 
 For a skill written by someone else, copy its folder into `skills/` and add the row
 to the External table instead, recording where it came from.
+
+## Adding an agent
+
+Create `agents/<name>.md` with the fields described in
+[Agents](#agents-one-source-generated-per-harness), add its Claude Code and OpenCode models to
+`agents/models.json`, add a row to the Agents table, and run `./install.sh`. Keep the filename
+equal to the `name` so Claude Code and OpenCode agree on the identity. Add the matching OpenCode
+`permissions` when the agent writes files or must not launch other agents.
